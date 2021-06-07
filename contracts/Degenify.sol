@@ -35,6 +35,8 @@ contract Degenify {
     event AddPickleFarm(uint pslpEthWbtcFarmBalanceAfter);
     event AddPickleJar(uint pslpETHWbtcBalanceAfter);
     event AddSushi(uint amountToken, uint amountETH, uint liquidity);
+    event RemovePickleJar(uint slpEthWbtcBalanceBefore, uint slpEthWbtcBalanceAfter);
+    event RemoveSushi(uint amountToken, uint amountETH);
 
     constructor() public {
         owner = payable(msg.sender);
@@ -45,7 +47,7 @@ contract Degenify {
         _;
     }
 
-    function apeSushiAndPickle(
+    function apeIntoSushiAndPickle(
         uint _value,
         uint amountTokenDesired,
         uint amountTokenMin,
@@ -54,20 +56,26 @@ contract Degenify {
         uint _percentToPickleJar,
         uint _percentToPickleFarm
     ) public onlyOwner {
-        (uint amountToken, uint amountETH, uint liquidity) = addLiquidityToETHWbtcSushi(
-            _value,
-            amountTokenDesired,
-            amountTokenMin,
-            amountETHMin,
-            deadline
-        );
-
-        emit AddSushi(amountToken, amountETH, liquidity);
-
         slpEthWbtcAddress = UniswapV2Library.pairFor(address(0xC0AEe478e3658e2610c5F7A4A2E1777cE9e4f2Ac), wbtcAddress, wethAddress);
-        uint slpEthWbtcBalance = IERC20(slpEthWbtcAddress).balanceOf(address(this));
 
-        require(slpEthWbtcBalance >= liquidity, "didn't receive eth-wbtc sushi lp token");
+        uint slpEthWbtcBalanceBefore = IERC20(slpEthWbtcAddress).balanceOf(address(this));
+        uint slpEthWbtcBalanceAfter = slpEthWbtcBalanceBefore;
+
+        if (amountTokenDesired > 0) {
+            (uint amountToken, uint amountETH, uint liquidity) = addLiquidityToETHWbtcSushi(
+                _value,
+                amountTokenDesired,
+                amountTokenMin,
+                amountETHMin,
+                deadline
+            );
+
+            emit AddSushi(amountToken, amountETH, liquidity);
+
+            slpEthWbtcBalanceAfter = IERC20(slpEthWbtcAddress).balanceOf(address(this));
+
+            require(slpEthWbtcBalanceAfter >= liquidity, "didn't receive eth-wbtc sushi lp token");
+        }
 
         uint pslpEthWbtcBalanceBefore = pslpEthWbtcJar.balanceOf(address(this));
         uint pslpETHWbtcBalanceAfter = pslpEthWbtcBalanceBefore;
@@ -79,13 +87,13 @@ contract Degenify {
                 percentToPickleJar = 100;
             }
 
-            depositSlpEthWbtcToJar(percentToPickleJar, slpEthWbtcBalance);
+            depositSlpEthWbtcToJar(percentToPickleJar, slpEthWbtcBalanceAfter);
 
             pslpETHWbtcBalanceAfter = pslpEthWbtcJar.balanceOf(address(this));
 
             emit AddPickleJar(pslpETHWbtcBalanceAfter);
 
-            require(pslpETHWbtcBalanceAfter > pslpEthWbtcBalanceBefore, "didn't receive enough eth-wbtc pslp (pickle jar) token");
+            require(pslpETHWbtcBalanceAfter > pslpEthWbtcBalanceBefore, "didn't receive eth-wbtc slp pickle jar token");
         }
 
         uint pslpEthWbtcFarmBalanceBefore = pslpEthWbtcFarm.balanceOf(address(this));
@@ -104,7 +112,77 @@ contract Degenify {
 
             emit AddPickleFarm(pslpEthWbtcFarmBalanceAfter);
 
-            require(pslpEthWbtcFarmBalanceAfter > pslpEthWbtcFarmBalanceBefore, "didn't receive (enough) eth-wbtc slp pickle farm token");
+            require(pslpEthWbtcFarmBalanceAfter > pslpEthWbtcFarmBalanceBefore, "didn't receive eth-wbtc slp pickle farm token");
+        }
+    }
+
+    function bailOutOfSushiAndPickle(
+        uint amountTokenMin,
+        uint amountETHMin,
+        uint deadline,
+        uint _percentFromSushi,
+        uint _percentFromPickleJar,
+        uint _percentFromPickleFarm
+    ) public onlyOwner {
+        // uint pslpEthWbtcFarmBalanceBefore = pslpEthWbtcFarm.balanceOf(address(this));
+        // uint pslpEthWbtcFarmBalanceAfter = pslpEthWbtcFarmBalanceBefore;
+
+        // if (pslpETHWbtcBalanceAfter > 0 && _percentToPickleFarm > 0) {
+        //     uint percentToPickleFarm = _percentToPickleFarm;
+
+        //     if (_percentToPickleFarm > 100) {
+        //         percentToPickleFarm = 100;
+        //     }
+
+        //     despositPslpEthWbtcToFarm(percentToPickleFarm, pslpETHWbtcBalanceAfter);
+
+        //     pslpEthWbtcFarmBalanceAfter = pslpEthWbtcFarm.balanceOf(address(this));
+
+        //     emit AddPickleFarm(pslpEthWbtcFarmBalanceAfter);
+
+        //     require(pslpEthWbtcFarmBalanceAfter > pslpEthWbtcFarmBalanceBefore, "didn't receive (enough) eth-wbtc slp pickle farm token");
+        // }
+
+        if (_percentFromPickleJar > 0) {
+            uint percentFromPickleJar = _percentFromPickleJar;
+
+            if (_percentFromPickleJar > 100) {
+                percentFromPickleJar = 100;
+            }
+
+            uint slpEthWbtcBalanceBefore = IERC20(slpEthWbtcAddress).balanceOf(address(this));
+
+            uint pslpEthWbtcBalance = pslpEthWbtcJar.balanceOf(address(this));
+            uint pslpEthWbtcToRemove = pslpEthWbtcBalance.mul(percentFromPickleJar).div(100);
+
+            pslpEthWbtcJar.withdraw(pslpEthWbtcToRemove);
+
+            uint slpEthWbtcBalanceAfter = IERC20(slpEthWbtcAddress).balanceOf(address(this));
+
+            emit RemovePickleJar(slpEthWbtcBalanceBefore, slpEthWbtcBalanceAfter);
+        }
+
+        if (_percentFromSushi > 0) {
+            uint percentFromSushi = _percentFromSushi;
+
+            if (_percentFromSushi > 100) {
+                percentFromSushi = 100;
+            }
+
+            uint slpEthWbtcBalance = IERC20(slpEthWbtcAddress).balanceOf(address(this));
+            uint slpEthWbtcToRemove = slpEthWbtcBalance.mul(percentFromSushi).div(100);
+            IERC20(slpEthWbtcAddress).approve(address(sushiRouter), slpEthWbtcToRemove);
+
+            (uint amountToken, uint amountETH) = sushiRouter.removeLiquidityETH(
+                wbtcAddress,
+                slpEthWbtcToRemove,
+                amountTokenMin,
+                amountETHMin,
+                address(this),
+                deadline
+            );
+
+            emit RemoveSushi(amountToken, amountETH);
         }
     }
 
@@ -137,7 +215,7 @@ contract Degenify {
         uint pslpETHWbtcBalance
     ) private {
         uint depositAmount = pslpETHWbtcBalance.mul(percentToPickleFarm).div(100);
-        IERC20(slpEthWbtcAddress).approve(address(pslpEthWbtcFarm), depositAmount);
+        IERC20(pslpEthWbtcAddress).approve(address(pslpEthWbtcFarm), depositAmount);
 
         pslpEthWbtcFarm.deposit(depositAmount);
     }

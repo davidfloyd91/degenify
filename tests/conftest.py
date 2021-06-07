@@ -34,6 +34,22 @@ def wbtc_whale(accounts):
 ##########
 
 @pytest.fixture
+def pslp_eth_wbtc_address():
+    yield "0xde74b6c547bd574c3527316a2eE30cd8F6041525"
+
+@pytest.fixture
+def pslp_eth_wbtc_contract(pslp_eth_wbtc_address):
+    yield Contract(pslp_eth_wbtc_address)
+
+@pytest.fixture
+def pslp_eth_wbtc_farm_address():
+    yield "0xD55331E7bCE14709d825557E5Bca75C73ad89bFb"
+
+@pytest.fixture
+def pslp_eth_wbtc_farm_contract(pslp_eth_wbtc_farm_address):
+    yield Contract(pslp_eth_wbtc_farm_address)
+
+@pytest.fixture
 def slp_eth_wbtc_address(
     sushi_factory,
     wbtc_address,
