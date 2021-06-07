@@ -1,0 +1,11 @@
+networks:
+  default: mainnet-fork
+
+autofetch_sources: True
+
+compiler:
+  solc:
+    version: 0.6.12
+
+dependencies:
+  - OpenZeppelin/openzeppelin-contracts@4.1.0

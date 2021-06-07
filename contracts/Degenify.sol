@@ -1,0 +1,168 @@
+// SPDX-License-Identifier: MIT
+
+pragma solidity 0.6.12;
+
+import { IERC20 } from "../interfaces/IERC20.sol";
+import { IPickleFarm } from "../interfaces/IPickleFarm.sol";
+import { IPickleJar } from "../interfaces/IPickleJar.sol";
+import { IUniswapV2Router02 } from "../interfaces/IUniswapV2Router02.sol";
+import { IUniswapV2Factory } from "../interfaces/IUniswapV2Factory.sol";
+import { SafeMath } from './libraries/SafeMath.sol';
+import { UniswapV2Library } from './libraries/UniswapV2Library.sol';
+
+contract Degenify {
+    using SafeMath for uint256;
+
+    string public name = "Degenify";
+
+    address payable public owner;
+
+    address wethAddress = address(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
+
+    address wbtcAddress = address(0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599);
+    IERC20 wbtc = IERC20(wbtcAddress);
+
+    address slpEthWbtcAddress; // set by factory lookup in go()
+
+    address pslpEthWbtcAddress = address(0xde74b6c547bd574c3527316a2eE30cd8F6041525);
+    IPickleJar pslpEthWbtcJar = IPickleJar(pslpEthWbtcAddress);
+
+    address pslpEthWbtcGaugeAddress = address(0xD55331E7bCE14709d825557E5Bca75C73ad89bFb);
+    IPickleFarm pslpEthWbtcFarm = IPickleFarm(pslpEthWbtcGaugeAddress);
+
+    IUniswapV2Router02 sushiRouter = IUniswapV2Router02(address(0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F));
+
+    event AddPickleFarm(uint pslpEthWbtcFarmBalanceAfter);
+    event AddPickleJar(uint pslpETHWbtcBalanceAfter);
+    event AddSushi(uint amountToken, uint amountETH, uint liquidity);
+
+    constructor() public {
+        owner = payable(msg.sender);
+    }
+
+    modifier onlyOwner() {
+        require(owner == msg.sender, "caller is not the owner");
+        _;
+    }
+
+    function apeSushiAndPickle(
+        uint _value,
+        uint amountTokenDesired,
+        uint amountTokenMin,
+        uint amountETHMin,
+        uint deadline,
+        uint _percentToPickleJar,
+        uint _percentToPickleFarm
+    ) public onlyOwner {
+        (uint amountToken, uint amountETH, uint liquidity) = addLiquidityToETHWbtcSushi(
+            _value,
+            amountTokenDesired,
+            amountTokenMin,
+            amountETHMin,
+            deadline
+        );
+
+        emit AddSushi(amountToken, amountETH, liquidity);
+
+        slpEthWbtcAddress = UniswapV2Library.pairFor(address(0xC0AEe478e3658e2610c5F7A4A2E1777cE9e4f2Ac), wbtcAddress, wethAddress);
+        uint slpEthWbtcBalance = IERC20(slpEthWbtcAddress).balanceOf(address(this));
+
+        require(slpEthWbtcBalance >= liquidity, "didn't receive eth-wbtc sushi lp token");
+
+        uint pslpEthWbtcBalanceBefore = pslpEthWbtcJar.balanceOf(address(this));
+        uint pslpETHWbtcBalanceAfter = pslpEthWbtcBalanceBefore;
+
+        if (_percentToPickleJar > 0) {
+            uint percentToPickleJar = _percentToPickleJar;
+
+            if (_percentToPickleJar > 100) {
+                percentToPickleJar = 100;
+            }
+
+            depositSlpEthWbtcToJar(percentToPickleJar, slpEthWbtcBalance);
+
+            pslpETHWbtcBalanceAfter = pslpEthWbtcJar.balanceOf(address(this));
+
+            emit AddPickleJar(pslpETHWbtcBalanceAfter);
+
+            require(pslpETHWbtcBalanceAfter > pslpEthWbtcBalanceBefore, "didn't receive enough eth-wbtc pslp (pickle jar) token");
+        }
+
+        uint pslpEthWbtcFarmBalanceBefore = pslpEthWbtcFarm.balanceOf(address(this));
+        uint pslpEthWbtcFarmBalanceAfter = pslpEthWbtcFarmBalanceBefore;
+
+        if (pslpETHWbtcBalanceAfter > 0 && _percentToPickleFarm > 0) {
+            uint percentToPickleFarm = _percentToPickleFarm;
+
+            if (_percentToPickleFarm > 100) {
+                percentToPickleFarm = 100;
+            }
+
+            despositPslpEthWbtcToFarm(percentToPickleFarm, pslpETHWbtcBalanceAfter);
+
+            pslpEthWbtcFarmBalanceAfter = pslpEthWbtcFarm.balanceOf(address(this));
+
+            emit AddPickleFarm(pslpEthWbtcFarmBalanceAfter);
+
+            require(pslpEthWbtcFarmBalanceAfter > pslpEthWbtcFarmBalanceBefore, "didn't receive (enough) eth-wbtc slp pickle farm token");
+        }
+    }
+
+    function addLiquidityToETHWbtcSushi(
+        uint _value,
+        uint amountTokenDesired,
+        uint amountTokenMin,
+        uint amountETHMin,
+        uint deadline
+    ) private returns (uint amountToken, uint amountETH, uint liquidity) {
+        wbtc.approve(address(sushiRouter), uint(-1));
+        IERC20(wethAddress).approve(address(sushiRouter), uint(-1));
+
+        (uint _amountToken, uint _amountETH, uint _liquidity) = sushiRouter.addLiquidityETH{
+            value: _value
+        }(
+            wbtcAddress,
+            amountTokenDesired,
+            amountTokenMin,
+            amountETHMin,
+            address(this),
+            deadline
+        );
+
+        return (_amountToken, _amountETH, _liquidity);
+    }
+
+    function despositPslpEthWbtcToFarm(
+        uint percentToPickleFarm,
+        uint pslpETHWbtcBalance
+    ) private {
+        uint depositAmount = pslpETHWbtcBalance.mul(percentToPickleFarm).div(100);
+        IERC20(slpEthWbtcAddress).approve(address(pslpEthWbtcFarm), depositAmount);
+
+        pslpEthWbtcFarm.deposit(depositAmount);
+    }
+
+    function depositSlpEthWbtcToJar(
+        uint percentToPickleJar,
+        uint slpEthWbtcBalance
+    ) private {
+        uint depositAmount = slpEthWbtcBalance.mul(percentToPickleJar).div(100);
+        IERC20(slpEthWbtcAddress).approve(address(pslpEthWbtcJar), depositAmount);
+
+        pslpEthWbtcJar.deposit(depositAmount);
+    }
+
+    function updateOwner(address payable _owner) public onlyOwner {
+        owner = _owner;
+    }
+
+    function withdrawETH(uint _amount) public onlyOwner {
+        owner.transfer(_amount);
+    }
+
+    function withdrawToken(uint _amount, address _token) public onlyOwner {
+        IERC20(_token).transfer(owner, _amount);
+    }
+
+    receive() external payable {}
+}
