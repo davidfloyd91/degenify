@@ -35,6 +35,7 @@ contract Degenify {
     event AddPickleFarm(uint pslpEthWbtcFarmBalanceAfter);
     event AddPickleJar(uint pslpETHWbtcBalanceAfter);
     event AddSushi(uint amountToken, uint amountETH, uint liquidity);
+    event RemovePickleFarm(uint pslpEthWbtcFarmBalanceBefore, uint tpslpEthWbtcFarmBalanceAfter);
     event RemovePickleJar(uint slpEthWbtcBalanceBefore, uint slpEthWbtcBalanceAfter);
     event RemoveSushi(uint amountToken, uint amountETH);
 
@@ -116,6 +117,73 @@ contract Degenify {
         }
     }
 
+    function removeFromPickleFarm(
+        uint pslpEthWbtcFarmBalanceBefore,
+        uint _percentFromPickleFarm
+    ) private {
+        uint percentFromPickleFarm = _percentFromPickleFarm;
+
+        if (_percentFromPickleFarm > 100) {
+            percentFromPickleFarm = 100;
+        }
+
+        uint pslpEthWbtcToRemove = pslpEthWbtcFarmBalanceBefore.mul(percentFromPickleFarm).div(100);
+
+        pslpEthWbtcFarm.withdraw(pslpEthWbtcToRemove);
+
+        uint pslpEthWbtcFarmBalanceAfter = pslpEthWbtcFarm.balanceOf(address(this));
+
+        emit RemovePickleFarm(pslpEthWbtcFarmBalanceBefore, pslpEthWbtcFarmBalanceAfter);
+    }
+
+    function removeFromPickleJar(
+        uint slpEthWbtcBalanceBefore,
+        uint _percentFromPickleJar
+    ) private {
+        uint percentFromPickleJar = _percentFromPickleJar;
+
+        if (_percentFromPickleJar > 100) {
+            percentFromPickleJar = 100;
+        }
+
+        uint pslpEthWbtcBalance = pslpEthWbtcJar.balanceOf(address(this));
+        uint pslpEthWbtcToRemove = pslpEthWbtcBalance.mul(percentFromPickleJar).div(100);
+
+        pslpEthWbtcJar.withdraw(pslpEthWbtcToRemove);
+
+        uint slpEthWbtcBalanceAfter = IERC20(slpEthWbtcAddress).balanceOf(address(this));
+
+        emit RemovePickleJar(slpEthWbtcBalanceBefore, slpEthWbtcBalanceAfter);
+    }
+
+    function removeFromSushi(
+        uint slpEthWbtcBalance,
+        uint _percentFromSushi,
+        uint amountTokenMin,
+        uint amountETHMin,
+        uint deadline
+    ) private {
+        uint percentFromSushi = _percentFromSushi;
+
+        if (_percentFromSushi > 100) {
+            percentFromSushi = 100;
+        }
+
+        uint slpEthWbtcToRemove = slpEthWbtcBalance.mul(percentFromSushi).div(100);
+        IERC20(slpEthWbtcAddress).approve(address(sushiRouter), slpEthWbtcToRemove);
+
+        (uint amountToken, uint amountETH) = sushiRouter.removeLiquidityETH(
+            wbtcAddress,
+            slpEthWbtcToRemove,
+            amountTokenMin,
+            amountETHMin,
+            address(this),
+            deadline
+        );
+
+        emit RemoveSushi(amountToken, amountETH);
+    }
+
     function bailOutOfSushiAndPickle(
         uint amountTokenMin,
         uint amountETHMin,
@@ -124,65 +192,22 @@ contract Degenify {
         uint _percentFromPickleJar,
         uint _percentFromPickleFarm
     ) public onlyOwner {
-        // uint pslpEthWbtcFarmBalanceBefore = pslpEthWbtcFarm.balanceOf(address(this));
-        // uint pslpEthWbtcFarmBalanceAfter = pslpEthWbtcFarmBalanceBefore;
+        uint pslpEthWbtcFarmBalanceBefore = pslpEthWbtcFarm.balanceOf(address(this));
 
-        // if (pslpETHWbtcBalanceAfter > 0 && _percentToPickleFarm > 0) {
-        //     uint percentToPickleFarm = _percentToPickleFarm;
-
-        //     if (_percentToPickleFarm > 100) {
-        //         percentToPickleFarm = 100;
-        //     }
-
-        //     despositPslpEthWbtcToFarm(percentToPickleFarm, pslpETHWbtcBalanceAfter);
-
-        //     pslpEthWbtcFarmBalanceAfter = pslpEthWbtcFarm.balanceOf(address(this));
-
-        //     emit AddPickleFarm(pslpEthWbtcFarmBalanceAfter);
-
-        //     require(pslpEthWbtcFarmBalanceAfter > pslpEthWbtcFarmBalanceBefore, "didn't receive (enough) eth-wbtc slp pickle farm token");
-        // }
-
-        if (_percentFromPickleJar > 0) {
-            uint percentFromPickleJar = _percentFromPickleJar;
-
-            if (_percentFromPickleJar > 100) {
-                percentFromPickleJar = 100;
-            }
-
-            uint slpEthWbtcBalanceBefore = IERC20(slpEthWbtcAddress).balanceOf(address(this));
-
-            uint pslpEthWbtcBalance = pslpEthWbtcJar.balanceOf(address(this));
-            uint pslpEthWbtcToRemove = pslpEthWbtcBalance.mul(percentFromPickleJar).div(100);
-
-            pslpEthWbtcJar.withdraw(pslpEthWbtcToRemove);
-
-            uint slpEthWbtcBalanceAfter = IERC20(slpEthWbtcAddress).balanceOf(address(this));
-
-            emit RemovePickleJar(slpEthWbtcBalanceBefore, slpEthWbtcBalanceAfter);
+        if (pslpEthWbtcFarmBalanceBefore > 0 && _percentFromPickleFarm > 0) {
+            removeFromPickleFarm(pslpEthWbtcFarmBalanceBefore, _percentFromPickleFarm);
         }
 
-        if (_percentFromSushi > 0) {
-            uint percentFromSushi = _percentFromSushi;
+        uint pslpEthWbtcBalanceBefore = IERC20(pslpEthWbtcAddress).balanceOf(address(this));
 
-            if (_percentFromSushi > 100) {
-                percentFromSushi = 100;
-            }
+        if (pslpEthWbtcBalanceBefore > 0 && _percentFromPickleJar > 0) {
+            removeFromPickleJar(pslpEthWbtcBalanceBefore, _percentFromPickleJar);
+        }
 
-            uint slpEthWbtcBalance = IERC20(slpEthWbtcAddress).balanceOf(address(this));
-            uint slpEthWbtcToRemove = slpEthWbtcBalance.mul(percentFromSushi).div(100);
-            IERC20(slpEthWbtcAddress).approve(address(sushiRouter), slpEthWbtcToRemove);
+        uint slpEthWbtcBalance = IERC20(slpEthWbtcAddress).balanceOf(address(this));
 
-            (uint amountToken, uint amountETH) = sushiRouter.removeLiquidityETH(
-                wbtcAddress,
-                slpEthWbtcToRemove,
-                amountTokenMin,
-                amountETHMin,
-                address(this),
-                deadline
-            );
-
-            emit RemoveSushi(amountToken, amountETH);
+        if (slpEthWbtcBalance > 0 && _percentFromSushi > 0) {
+            removeFromSushi(slpEthWbtcBalance, _percentFromSushi, amountTokenMin, amountETHMin, deadline);
         }
     }
 

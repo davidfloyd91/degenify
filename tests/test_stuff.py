@@ -473,5 +473,60 @@ pslp_eth_wbtc_balance_after
     assert pslp_eth_wbtc_balance_after < pslp_eth_wbtc_balance_before, "didn't reduce pickle jar token balance"
 
 # TODO: test_remove_all_from_pickle_jar
-# TODO: test_remove_some_from_pickle_farm
+
+def test_remove_some_from_pickle_farm(
+    degenify_contract,
+    owner,
+    pslp_eth_wbtc_contract,
+    pslp_eth_wbtc_farm_contract,
+    slp_eth_wbtc_contract,
+    wbtc_contract,
+    wbtc_whale,
+    whale
+):
+    eth_receive_amount = 5 * 10 ** 18
+    whale.transfer(degenify_contract, eth_receive_amount)
+    wbtc_receive_amount = 1 * 10 ** (8 - 1)
+    wbtc_contract.transfer(degenify_contract, wbtc_receive_amount, {'from': wbtc_whale})
+    degenify_contract.apeIntoSushiAndPickle(
+        eth_receive_amount,     # uint _value
+        wbtc_receive_amount,    # uint amountTokenDesired,
+        wbtc_receive_amount,    # uint amountTokenMin,
+        0,                      # uint amountETHMin,
+        time.time() + 6000000,  # uint deadline,
+        100,                    # uint _percentToPickleJar,
+        100,                    # uint _percentToPickleFarm
+        {'from': owner}
+    )
+    pslp_eth_wbtc_balance_before = pslp_eth_wbtc_contract.balanceOf(degenify_contract)
+    pslp_eth_wbtc_farm_balance_before = pslp_eth_wbtc_farm_contract.balanceOf(degenify_contract)
+    degenify_contract.bailOutOfSushiAndPickle(
+        0,                      # uint amountTokenMin,
+        0,                      # uint amountETHMin,
+        time.time() + 6000000,  # uint deadline,
+        0,                      # uint _percentFromSushi,
+        0,                     # uint _percentFromPickleJar,
+        50,                      # uint _percentFromPickleFarm
+        {'from': owner}
+    )
+    pslp_eth_wbtc_balance_after = pslp_eth_wbtc_contract.balanceOf(degenify_contract)
+    pslp_eth_wbtc_farm_balance_after = pslp_eth_wbtc_farm_contract.balanceOf(degenify_contract)
+    print(f"""
+==================================
+pslp_eth_wbtc_balance_before
+{cyan}{pslp_eth_wbtc_balance_before}
+{white}==================================
+pslp_eth_wbtc_balance_after
+{cyan}{pslp_eth_wbtc_balance_after}
+{white}==================================
+pslp_eth_wbtc_farm_balance_before
+{magenta}{pslp_eth_wbtc_farm_balance_before}
+{white}==================================
+pslp_eth_wbtc_farm_balance_after
+{magenta}{pslp_eth_wbtc_farm_balance_after}
+{white}==================================
+    """)
+    assert pslp_eth_wbtc_balance_after > pslp_eth_wbtc_balance_before, "didn't increase sushi liquidity token balance"
+    assert pslp_eth_wbtc_farm_balance_after < pslp_eth_wbtc_farm_balance_before, "didn't reduce pickle farm token balance"
+
 # TODO: test_remove_all_from_pickle_farm
