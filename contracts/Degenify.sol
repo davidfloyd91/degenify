@@ -22,7 +22,7 @@ contract Degenify {
     address wbtcAddress = address(0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599);
     IERC20 wbtc = IERC20(wbtcAddress);
 
-    address slpEthWbtcAddress; // set by factory lookup in go()
+    address slpEthWbtcAddress;
 
     address pslpEthWbtcAddress = address(0xde74b6c547bd574c3527316a2eE30cd8F6041525);
     IPickleJar pslpEthWbtcJar = IPickleJar(pslpEthWbtcAddress);

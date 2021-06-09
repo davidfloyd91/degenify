@@ -416,8 +416,6 @@ slp_eth_wbtc_balance_after
     assert wbtc_balance_after > wbtc_balance_before, "didn't increase wbtc balance"
     assert slp_eth_wbtc_balance_after < slp_eth_wbtc_balance_before, "didn't reduce sushi liquidity token balance"
 
-# TODO: test_remove_all_from_sushi
-
 def test_remove_some_from_pickle_jar(
     degenify_contract,
     owner,
@@ -472,14 +470,11 @@ pslp_eth_wbtc_balance_after
     assert slp_eth_wbtc_balance_after > slp_eth_wbtc_balance_before, "didn't increase sushi liquidity token balance"
     assert pslp_eth_wbtc_balance_after < pslp_eth_wbtc_balance_before, "didn't reduce pickle jar token balance"
 
-# TODO: test_remove_all_from_pickle_jar
-
 def test_remove_some_from_pickle_farm(
     degenify_contract,
     owner,
     pslp_eth_wbtc_contract,
     pslp_eth_wbtc_farm_contract,
-    slp_eth_wbtc_contract,
     wbtc_contract,
     wbtc_whale,
     whale
@@ -505,8 +500,8 @@ def test_remove_some_from_pickle_farm(
         0,                      # uint amountETHMin,
         time.time() + 6000000,  # uint deadline,
         0,                      # uint _percentFromSushi,
-        0,                     # uint _percentFromPickleJar,
-        50,                      # uint _percentFromPickleFarm
+        0,                      # uint _percentFromPickleJar,
+        50,                     # uint _percentFromPickleFarm
         {'from': owner}
     )
     pslp_eth_wbtc_balance_after = pslp_eth_wbtc_contract.balanceOf(degenify_contract)
@@ -529,4 +524,99 @@ pslp_eth_wbtc_farm_balance_after
     assert pslp_eth_wbtc_balance_after > pslp_eth_wbtc_balance_before, "didn't increase sushi liquidity token balance"
     assert pslp_eth_wbtc_farm_balance_after < pslp_eth_wbtc_farm_balance_before, "didn't reduce pickle farm token balance"
 
-# TODO: test_remove_all_from_pickle_farm
+def test_full_circle(
+    degenify_contract,
+    owner,
+    pslp_eth_wbtc_farm_contract,
+    wbtc_address,
+    wbtc_contract,
+    wbtc_whale,
+    whale
+):
+    eth_receive_amount = 500 * 10 ** 18
+    whale.transfer(degenify_contract, eth_receive_amount)
+    wbtc_receive_amount = 1 * 10 ** (8 - 1)
+    wbtc_contract.transfer(degenify_contract, wbtc_receive_amount, {'from': wbtc_whale})
+    degenify_contract.apeIntoSushiAndPickle(
+        eth_receive_amount,     # uint _value
+        wbtc_receive_amount,    # uint amountTokenDesired,
+        wbtc_receive_amount,    # uint amountTokenMin,
+        0,                      # uint amountETHMin,
+        time.time() + 6000000,  # uint deadline,
+        100,                    # uint _percentToPickleJar,
+        100,                    # uint _percentToPickleFarm
+        {'from': owner}
+    )
+    pslp_eth_wbtc_farm_balance_before = pslp_eth_wbtc_farm_contract.balanceOf(degenify_contract)
+    assert pslp_eth_wbtc_farm_balance_before > 0, "didn't receive positive pickle farm token balance"
+    eth_balance_before = degenify_contract.balance()
+    wbtc_balance_before = wbtc_contract.balanceOf(degenify_contract)
+    degenify_contract.bailOutOfSushiAndPickle(
+        0,                      # uint amountTokenMin,
+        0,                      # uint amountETHMin,
+        time.time() + 6000000,  # uint deadline,
+        100,                    # uint _percentFromSushi,
+        100,                    # uint _percentFromPickleJar,
+        100,                    # uint _percentFromPickleFarm
+        {'from': owner}
+    )
+    eth_balance_after = degenify_contract.balance()
+    wbtc_balance_after = wbtc_contract.balanceOf(degenify_contract)
+    pslp_eth_wbtc_farm_balance_after = pslp_eth_wbtc_farm_contract.balanceOf(degenify_contract)
+    print(f"""
+==================================
+eth_balance_before
+{eth_balance_before}
+==================================
+eth_balance_after
+{eth_balance_after}
+==================================
+wbtc_balance_before
+{wbtc_balance_before}
+==================================
+wbtc_balance_after
+{wbtc_balance_after}
+==================================
+pslp_eth_wbtc_farm_balance_before
+{yellow}{pslp_eth_wbtc_farm_balance_before}
+{white}==================================
+pslp_eth_wbtc_farm_balance_after
+{yellow}{pslp_eth_wbtc_farm_balance_after}
+{white}==================================
+    """)
+    assert pslp_eth_wbtc_farm_balance_after == 0, "didn't receive zero pickle farm token balance"
+    assert eth_balance_after > eth_balance_before, "didn't increase eth balance"
+    assert wbtc_balance_after > wbtc_balance_before, "didn't increase wbtc balance"
+    owner_eth_balance_before = owner.balance()
+    degenify_contract.withdrawETH(eth_balance_after, {'from': owner})
+    owner_eth_balance_after = owner.balance()
+    degenify_contract_eth_balance_after = degenify_contract.balance()
+    assert owner_eth_balance_after - owner_eth_balance_before > 0, "failed to withdraw eth (owner balance)"
+    assert degenify_contract_eth_balance_after == 0, "failed to withdraw eth (contract balance)"
+    owner_wbtc_balance_before = wbtc_contract.balanceOf(owner)
+    degenify_contract.withdrawToken(wbtc_balance_after, wbtc_address, {'from': owner})
+    owner_wbtc_balance_after = wbtc_contract.balanceOf(owner)
+    degenify_contract_wbtc_balance_after = wbtc_contract.balanceOf(degenify_contract)
+    assert owner_wbtc_balance_after - owner_wbtc_balance_before > 0, "failed to withdraw wbtc (owner balance)"
+    assert degenify_contract_wbtc_balance_after == 0, "failed to withdraw wbtc (contract balance)"
+    print(f"""
+==================================
+owner_eth_balance_before
+{owner_eth_balance_before}
+==================================
+owner_eth_balance_after
+{owner_eth_balance_after}
+==================================
+owner_wbtc_balance_before
+{owner_wbtc_balance_before}
+==================================
+owner_wbtc_balance_after
+{owner_wbtc_balance_after}
+==================================
+degenify_contract_eth_balance_after
+{degenify_contract_eth_balance_after}
+==================================
+degenify_contract_wbtc_balance_after
+{degenify_contract_wbtc_balance_after}
+==================================
+    """)
