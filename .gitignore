@@ -4,3 +4,4 @@ __pycache__
 build/
 reports/
 notes
+scripts/update_owner.py
