@@ -16,7 +16,7 @@ def main():
     amount_eth_min = 0
     deadline = time.time() + 6000000
     percent_to_pickle_jar = 100
-    percent_to_pickle_farm = 100
+    percent_to_pickle_farm = 0 # you can't harvest so
     #################################################
     #################################################
     #################################################
