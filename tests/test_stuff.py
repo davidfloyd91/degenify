@@ -190,7 +190,7 @@ def test_stake_in_sushi_and_pickle_farm_some(
         0,                      # uint amountETHMin,
         time.time() + 6000000,  # uint deadline,
         100,                    # uint _percentToPickleJar,
-        50,                      # uint _percentToPickleFarm
+        50,                     # uint _percentToPickleFarm
         {'from': owner}
     )
     slp_eth_wbtc_balance = slp_eth_wbtc_contract.balanceOf(degenify_contract)
