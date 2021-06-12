@@ -10,6 +10,7 @@ import { IUniswapV2Factory } from "../interfaces/IUniswapV2Factory.sol";
 import { SafeMath } from './libraries/SafeMath.sol';
 import { UniswapV2Library } from './libraries/UniswapV2Library.sol';
 
+// V2
 contract Degenify {
     using SafeMath for uint256;
 
@@ -115,6 +116,10 @@ contract Degenify {
 
             require(pslpEthWbtcFarmBalanceAfter > pslpEthWbtcFarmBalanceBefore, "didn't receive eth-wbtc slp pickle farm token");
         }
+    }
+
+    function harvestPickle() public onlyOwner {
+        pslpEthWbtcFarm.getReward();
     }
 
     function removeFromPickleFarm(

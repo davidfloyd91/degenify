@@ -1,5 +1,5 @@
 import time
-from brownie import reverts
+from brownie import chain, reverts
 
 # brownie test --interactive -s -v
 
@@ -620,3 +620,51 @@ degenify_contract_wbtc_balance_after
 {degenify_contract_wbtc_balance_after}
 ==================================
     """)
+
+def test_harvest_pickles(
+    degenify_contract,
+    owner,
+    pickle_address,
+    pickle_contract,
+    wbtc_contract,
+    wbtc_whale,
+    whale
+):
+    eth_receive_amount = 500 * 10 ** 18
+    whale.transfer(degenify_contract, eth_receive_amount)
+    wbtc_receive_amount = 1 * 10 ** (8 - 1)
+    wbtc_contract.transfer(degenify_contract, wbtc_receive_amount, {'from': wbtc_whale})
+    degenify_contract.apeIntoSushiAndPickle(
+        eth_receive_amount,     # uint _value
+        wbtc_receive_amount,    # uint amountTokenDesired,
+        wbtc_receive_amount,    # uint amountTokenMin,
+        0,                      # uint amountETHMin,
+        time.time() + 6000000,  # uint deadline,
+        100,                    # uint _percentToPickleJar,
+        100,                    # uint _percentToPickleFarm
+        {'from': owner}
+    )
+    chain.sleep(60)
+    chain.mine(1000)
+    chain.sleep(60)
+    degenify_contract.harvestPickle({'from': owner})
+    degenify_pickle_balance_before = pickle_contract.balanceOf(degenify_contract)
+    assert degenify_pickle_balance_before > 0, "didn't receive positive pickle dao token balance"    
+    degenify_contract.withdrawToken(degenify_pickle_balance_before, pickle_address, {'from': owner})
+    degenify_pickle_balance_after = pickle_contract.balanceOf(degenify_contract)
+    assert degenify_pickle_balance_after == 0, "didn't receive zero pickle dao token balance"
+    owner_pickle_balance = pickle_contract.balanceOf(owner)
+    assert owner_pickle_balance == degenify_pickle_balance_before and owner_pickle_balance > 0, "didn't receive positive pickle dao token balance for owner"
+    print(f"""
+==================================
+degenify_pickle_balance_before
+{green}{degenify_pickle_balance_before}
+{white}==================================
+degenify_pickle_balance_after
+{green}{degenify_pickle_balance_after}
+{white}==================================
+owner_pickle_balance
+{green}{owner_pickle_balance}
+{white}==================================
+    """)
+
