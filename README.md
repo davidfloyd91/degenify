@@ -2,7 +2,7 @@
 
 ### V2
 
-Deployed at `TBD`.
+Deployed at `0x2BCA6A5301B41457B05DDb201A00A68b4Dbc8571`.
 
 
 Consolidate some defi degeneracy you might like to do repeatedly into a single contract call, `apeIntoSushiAndPickle`:
