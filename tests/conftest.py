@@ -34,6 +34,14 @@ def wbtc_whale(accounts):
 ##########
 
 @pytest.fixture
+def pickle_address():
+    yield "0x429881672b9ae42b8eba0e26cd9c73711b891ca5"
+
+@pytest.fixture
+def pickle_contract(pickle_address):
+    yield Contract(pickle_address)
+
+@pytest.fixture
 def pslp_eth_wbtc_address():
     yield "0xde74b6c547bd574c3527316a2eE30cd8F6041525"
 
