@@ -1,5 +1,5 @@
 import time
-from brownie import Contract, Degenify
+from brownie import Contract
 
 cyan = "\033[36m"
 green = "\033[32m"
@@ -9,8 +9,8 @@ yellow = "\033[33m"
 bright_blue = "\033[94m"
 
 def main():
-    degenify = Degenify[0]
-    degenify_address = degenify.address
+    degenify_address = '0x2BCA6A5301B41457B05DDb201A00A68b4Dbc8571'
+    degenify = Contract(degenify_address)
 
     wbtc_address = "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599"
     wbtc_contract = Contract(wbtc_address)
