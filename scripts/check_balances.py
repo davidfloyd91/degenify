@@ -33,6 +33,7 @@ def main():
     slp_eth_wbtc_balance = slp_eth_wbtc_contract.balanceOf(degenify_address)
     pslp_eth_wbtc_balance = pslp_eth_wbtc_contract.balanceOf(degenify_address)
     pslp_eth_wbtc_farm_balance = pslp_eth_wbtc_farm_contract.balanceOf(degenify_address)
+    unclaimed_pickle_rewards_balance = pslp_eth_wbtc_farm_contract.earned(degenify_address)
 
     print(f"""
 ==================================
@@ -50,5 +51,8 @@ pslp_eth_wbtc_balance
 {white}==================================
 pslp_eth_wbtc_farm_balance
 {bright_blue}{pslp_eth_wbtc_farm_balance}
+{white}==================================
+unclaimed_pickle_rewards_balance
+{green}{unclaimed_pickle_rewards_balance}
 {white}==================================
     """)
